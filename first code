@@ -1,0 +1,78 @@
+# Bias Detection in Recruitment Using Machine Learning
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Example: Load Dataset
+# Assume the dataset has these columns: 'gender', 'age', 'education_level', 'experience_years', 'hired'
+# Gender: 0 = Male, 1 = Female; Hired: 0 = Not hired, 1 = Hired
+
+df = pd.read_csv('recruitment_data.csv')
+
+# Preprocessing
+# Let's say 'education_level' is categorical
+df = pd.get_dummies(df, columns=['education_level'], drop_first=True)
+
+# Features and Target
+X = df.drop('hired', axis=1)
+y = df['hired']
+
+# Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Train Model
+model = RandomForestClassifier(random_state=42)
+model.fit(X_train, y_train)
+
+# Predictions
+y_pred = model.predict(X_test)
+
+# Model Evaluation
+print(classification_report(y_test, y_pred))
+
+# Feature Importance
+feature_importances = pd.Series(model.feature_importances_, index=X.columns)
+feature_importances.sort_values().plot(kind='barh', figsize=(10,6))
+plt.title('Feature Importances')
+plt.show()
+
+# =========================
+# BIAS DETECTION SECTION
+# =========================
+
+# Check Hiring Rate by Gender
+hiring_by_gender = df.groupby('gender')['hired'].mean()
+print("Hiring Rate by Gender:\n", hiring_by_gender)
+
+# Calculate Disparate Impact
+# 1 = Female, 0 = Male
+protected = df[df['gender'] == 1]
+unprotected = df[df['gender'] == 0]
+
+selection_rate_protected = protected['hired'].mean()
+selection_rate_unprotected = unprotected['hired'].mean()
+
+disparate_impact = selection_rate_protected / selection_rate_unprotected
+print(f"Disparate Impact (Female/Male): {disparate_impact:.2f}")
+
+# Threshold interpretation (80% rule)
+if disparate_impact < 0.8 or disparate_impact > 1.25:
+    print("⚠️ Potential Bias Detected (Fails 80% Rule)")
+else:
+    print("✅ No significant bias detected (Passes 80% Rule)")
+
+# Visualize Hiring Rates
+hiring_by_gender.plot(kind='bar', color=['blue', 'pink'])
+plt.xticks([0, 1], ['Male', 'Female'], rotation=0)
+plt.ylabel('Hiring Rate')
+plt.title('Hiring Rate by Gender')
+plt.show()
+
+# (Optional) Statistical Parity Difference
+spd = selection_rate_protected - selection_rate_unprotected
+print(f"Statistical Parity Difference: {spd:.2f}")
